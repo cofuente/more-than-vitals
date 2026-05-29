@@ -1,0 +1,154 @@
+#!/bin/bash
+# thermal-alert — lightweight thermal monitor with desktop notifications
+# Part of the More Than Vitals project
+
+set -euo pipefail
+
+# ─── Defaults ────────────────────────────────────────────────────────────────
+THRESHOLD=85
+COOLDOWN=5
+POLL=30
+SILENT=false
+AUTO_REMEDIATE=false
+
+# ─── State ───────────────────────────────────────────────────────────────────
+DISMISSED=false
+LAST_ALERT=0
+
+# ─── Usage ───────────────────────────────────────────────────────────────────
+usage() {
+    cat <<'EOF'
+thermal-alert — lightweight thermal monitor with desktop notifications
+
+Usage: thermal-alert [OPTIONS]
+
+Options:
+  -t, --threshold CELSIUS   Alert threshold in °C (default: 85)
+  -n, --cooldown  MINUTES   Suppress repeat alerts for N minutes (default: 5)
+  -p, --poll      SECONDS   Polling interval (default: 30)
+  -s, --silent              Silent mode — no alerts, exit 0 on breach
+      --auto-remediate      Auto-switch to balanced on breach (no dialog)
+  -h, --help                Show this help
+
+Examples:
+  thermal-alert                        # defaults: 85°C, 5min cooldown
+  thermal-alert -t 80 -n 10           # lower threshold, longer cooldown
+  thermal-alert --auto-remediate       # hands-free summer mode
+  thermal-alert -s                     # silent — useful with systemd logging
+EOF
+    exit 0
+}
+
+# ─── Parse args ──────────────────────────────────────────────────────────────
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -t|--threshold)     THRESHOLD="$2"; shift 2 ;;
+        -n|--cooldown)      COOLDOWN="$2"; shift 2 ;;
+        -p|--poll)          POLL="$2"; shift 2 ;;
+        -s|--silent)        SILENT=true; shift ;;
+        --auto-remediate)   AUTO_REMEDIATE=true; shift ;;
+        -h|--help)          usage ;;
+        *) echo "Unknown option: $1" >&2; usage ;;
+    esac
+done
+
+# ─── Sensor discovery ───────────────────────────────────────────────────────
+# Find a temp sensor by chip name. Returns the sysfs path to temp1_input.
+find_sensor() {
+    local name="$1"
+    for hwmon in /sys/class/hwmon/hwmon*; do
+        if [[ "$(cat "$hwmon/name" 2>/dev/null)" == "$name" ]]; then
+            local path="$hwmon/temp1_input"
+            if [[ -r "$path" ]]; then
+                echo "$path"
+                return 0
+            fi
+        fi
+    done
+    return 1
+}
+
+# Try AMD first, then Intel
+CPU_SENSOR=$(find_sensor "k10temp" || find_sensor "coretemp" || true)
+GPU_SENSOR=$(find_sensor "amdgpu" || find_sensor "nouveau" || true)
+
+if [[ -z "$CPU_SENSOR" && -z "$GPU_SENSOR" ]]; then
+    echo "thermal-alert: no CPU or GPU sensor found. Exiting." >&2
+    exit 1
+fi
+
+[[ -n "$CPU_SENSOR" ]] && echo "thermal-alert: CPU sensor → $CPU_SENSOR"
+[[ -n "$GPU_SENSOR" ]] && echo "thermal-alert: GPU sensor → $GPU_SENSOR"
+
+# ─── Helpers ─────────────────────────────────────────────────────────────────
+read_temp() {
+    local path="$1"
+    if [[ -n "$path" && -r "$path" ]]; then
+        echo $(( $(cat "$path") / 1000 ))
+    else
+        echo 0
+    fi
+}
+
+cooldown_active() {
+    local now elapsed cooldown_secs
+    now=$(date +%s)
+    elapsed=$(( now - LAST_ALERT ))
+    cooldown_secs=$(( COOLDOWN * 60 ))
+    (( elapsed < cooldown_secs ))
+}
+
+show_alert() {
+    local cpu_temp="$1" gpu_temp="$2"
+
+    local msg
+    msg="<b>CPU:</b> ${cpu_temp}°C    <b>GPU:</b> ${gpu_temp}°C\n"
+    msg+="Threshold of ${THRESHOLD}°C exceeded.\n\n"
+    msg+="<i>⚠️ Note: Auto-remediation has a cost — if it switches\n"
+    msg+="to balanced during a heavy compile or inference run,\n"
+    msg+="performance WILL drop noticeably.</i>"
+
+    if zenity --question \
+        --title="Thermal Alert" \
+        --text="$msg" \
+        --ok-label="Switch to Balanced Mode" \
+        --cancel-label="Dismiss" \
+        --width=420 \
+        --icon-name=dialog-warning 2>/dev/null; then
+        powerprofilesctl set balanced 2>/dev/null
+        notify-send -u normal "Thermal Alert" "Switched to balanced mode."
+    else
+        DISMISSED=true
+    fi
+
+    LAST_ALERT=$(date +%s)
+}
+
+# ─── Main loop ───────────────────────────────────────────────────────────────
+echo "thermal-alert: monitoring (threshold=${THRESHOLD}°C, cooldown=${COOLDOWN}m, poll=${POLL}s)"
+
+while true; do
+    cpu_temp=$(read_temp "$CPU_SENSOR")
+    gpu_temp=$(read_temp "$GPU_SENSOR")
+
+    if (( cpu_temp >= THRESHOLD || gpu_temp >= THRESHOLD )); then
+        if $DISMISSED; then
+            :
+        elif $SILENT; then
+            :
+        elif $AUTO_REMEDIATE; then
+            if ! cooldown_active; then
+                powerprofilesctl set balanced 2>/dev/null
+                notify-send -u normal "Thermal Alert" \
+                    "CPU: ${cpu_temp}°C | GPU: ${gpu_temp}°C — switched to balanced."
+                LAST_ALERT=$(date +%s)
+            fi
+        else
+            if ! cooldown_active; then
+                show_alert "$cpu_temp" "$gpu_temp"
+            fi
+        fi
+    fi
+
+    sleep "$POLL"
+done
