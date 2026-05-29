@@ -68,9 +68,9 @@ find_sensor() {
     return 1
 }
 
-# Try AMD first, then Intel
+# Try AMD first, then Intel; expand as hardware reports come in
 CPU_SENSOR=$(find_sensor "k10temp" || find_sensor "coretemp" || true)
-GPU_SENSOR=$(find_sensor "amdgpu" || find_sensor "nouveau" || true)
+GPU_SENSOR=$(find_sensor "amdgpu" || find_sensor "i915" || find_sensor "nouveau" || find_sensor "nvidia" || true)
 
 if [[ -z "$CPU_SENSOR" && -z "$GPU_SENSOR" ]]; then
     echo "thermal-alert: no CPU or GPU sensor found. Exiting." >&2
@@ -104,9 +104,9 @@ show_alert() {
     local msg
     msg="<b>CPU:</b> ${cpu_temp}°C    <b>GPU:</b> ${gpu_temp}°C\n"
     msg+="Threshold of ${THRESHOLD}°C exceeded.\n\n"
-    msg+="<i>⚠️ Note: Auto-remediation has a cost — if it switches\n"
-    msg+="to balanced during a heavy compile or inference run,\n"
-    msg+="performance WILL drop noticeably.</i>"
+    msg+="<i> Are you working your machine hard?</i> \n\n"
+    msg+="Just want to make sure you're not in the middle of a heavy compile or inference run.\n\n"
+    msg+="Pick balanced mode to cool your machine off."
 
     if zenity --question \
         --title="Thermal Alert" \
@@ -117,6 +117,7 @@ show_alert() {
         --icon-name=dialog-warning 2>/dev/null; then
         powerprofilesctl set balanced 2>/dev/null
         notify-send -u normal "Thermal Alert" "Switched to balanced mode."
+        DISMISSED=true
     else
         DISMISSED=true
     fi
