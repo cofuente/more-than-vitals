@@ -1,14 +1,14 @@
-# More Than Vitals
+# Thermal Control
 
 **Thermal alerts and more**
 
-GNOME's [Vitals](https://github.com/corecoding/Vitals) extension displays sensor data in the top bar — but it has no alerts, no thresholds, and no way to act when your machine gets hot. The **thermal-alert** fills that gap: a lightweight background monitor that watches CPU and GPU temperatures and notifies you when they cross a threshold.
+GNOME's [Vitals](https://github.com/corecoding/Vitals) extension displays sensor data in the top bar — but it has no alerts, no thresholds, and no way to act when your machine gets hot. The **thermal-control** fills that gap: a lightweight background monitor that watches CPU and GPU temperatures and notifies you when they cross a threshold.
 
 ---
 
 ## How It Works
 
-1. On startup, thermal-alert auto-detects your CPU and GPU sensors by scanning
+1. On startup, thermal-control auto-detects your CPU and GPU sensors by scanning
    `/sys/class/hwmon/` for known chip names, in this order:
 
    | Type | Chip names tried | Hardware |
@@ -36,19 +36,19 @@ GNOME's [Vitals](https://github.com/corecoding/Vitals) extension displays sensor
 
 Clone this repo:
 ```bash
-git clone https://github.com/cofuente/more-than-vitals.git
-cd more-than-vitals
+git clone https://github.com/cofuente/thermal-control.git
+cd thermal-control
 ```
 
 Add locally:
 ```bash
-cp thermal-alert ~/.local/bin/thermal-alert
-chmod +x ~/.local/bin/thermal-alert
+cp thermal-control ~/.local/bin/thermal-control
+chmod +x ~/.local/bin/thermal-control
 ```
 
 Verify it's in your PATH:
 ```bash
-which thermal-alert
+which thermal-control
 ```
 
 ### Dependencies
@@ -62,7 +62,7 @@ which thermal-alert
 ## Usage
 
 ```bash
-thermal-alert [OPTIONS]
+thermal-control [OPTIONS]
 ```
 
 | Flag | Description | Default |
@@ -78,16 +78,16 @@ thermal-alert [OPTIONS]
 
 ```bash
 # Run with defaults (85°C threshold, 5-minute cooldown)
-thermal-alert
+thermal-control
 
 # Lower threshold for summer, longer cooldown
-thermal-alert -t 80 -n 10
+thermal-control -t 80 -n 10
 
 # Hands-free summer mode — auto-switch to balanced, no dialog
-thermal-alert --auto-remediate
+thermal-control --auto-remediate
 
 # Silent monitoring (useful with systemd journal logging)
-thermal-alert -s
+thermal-control -s
 ```
 
 ---
@@ -103,7 +103,7 @@ threshold breach. The default is 5 minutes.
 
 ```bash
 # Alert at most once every 15 minutes
-thermal-alert -n 15
+thermal-control -n 15
 ```
 
 If you find alerts too frequent under sustained load (compiling, ML inference),
@@ -115,10 +115,10 @@ The `-t` flag sets the temperature in Celsius that triggers an alert.
 
 ```bash
 # More conservative — alert at 80°C
-thermal-alert -t 80
+thermal-control -t 80
 
 # Relaxed — only alert near throttling territory
-thermal-alert -t 95
+thermal-control -t 95
 ```
 
 **Reference thresholds** (varies by hardware):
@@ -132,14 +132,14 @@ thermal-alert -t 95
 
 ### Auto-Remediation
 
-When `--auto-remediate` is passed, thermal-alert skips the interactive dialog and immediately runs `powerprofilesctl set balanced` on threshold breach, then sends a non-blocking desktop notification.
+When `--auto-remediate` is passed, thermal-control skips the interactive dialog and immediately runs `powerprofilesctl set balanced` on threshold breach, then sends a non-blocking desktop notification.
 
 ```bash
 # Enable auto-remediation
-thermal-alert --auto-remediate
+thermal-control --auto-remediate
 
 # Combine with a lower threshold for proactive cooling
-thermal-alert --auto-remediate -t 80
+thermal-control --auto-remediate -t 80
 ```
 
 To **disable** auto-remediation, simply omit the flag — the default behavior is
@@ -155,7 +155,7 @@ sensor discovery to stdout (visible in the systemd journal if running as a
 service).
 
 ```bash
-thermal-alert -s
+thermal-control -s
 ```
 
 This is useful when you only want the monitoring infrastructure running (for
@@ -165,19 +165,19 @@ future integrations) without any user-facing notifications.
 
 ## Run at Login (Autostart)
 
-To have thermal-alert start automatically when you log in, create a systemd user
+To have thermal-control start automatically when you log in, create a systemd user
 unit:
 
 ```bash
 mkdir -p ~/.config/systemd/user
 
-cat > ~/.config/systemd/user/thermal-alert.service << 'EOF'
+cat > ~/.config/systemd/user/thermal-control.service << 'EOF'
 [Unit]
 Description=Thermal alert monitor
 After=graphical-session.target
 
 [Service]
-ExecStart=%h/.local/bin/thermal-alert
+ExecStart=%h/.local/bin/thermal-control
 Restart=on-failure
 RestartSec=10
 
@@ -190,7 +190,7 @@ Enable and start it:
 
 ```bash
 systemctl --user daemon-reload
-systemctl --user enable --now thermal-alert.service
+systemctl --user enable --now thermal-control.service
 ```
 
 ### Passing custom flags
@@ -198,20 +198,20 @@ systemctl --user enable --now thermal-alert.service
 Edit the `ExecStart` line in the unit file:
 
 ```ini
-ExecStart=%h/.local/bin/thermal-alert -t 80 -n 10 --auto-remediate
+ExecStart=%h/.local/bin/thermal-control -t 80 -n 10 --auto-remediate
 ```
 
 Then reload:
 
 ```bash
 systemctl --user daemon-reload
-systemctl --user restart thermal-alert.service
+systemctl --user restart thermal-control.service
 ```
 
 ### Disabling autostart
 
 ```bash
-systemctl --user disable --now thermal-alert.service
+systemctl --user disable --now thermal-control.service
 ```
 
 This stops the current instance and prevents it from starting at next login.
@@ -235,13 +235,13 @@ Restart=no
 
 ```bash
 # Status
-systemctl --user status thermal-alert.service
+systemctl --user status thermal-control.service
 
 # Recent logs
-journalctl --user -u thermal-alert.service --since "1 hour ago"
+journalctl --user -u thermal-control.service --since "1 hour ago"
 
 # Follow live
-journalctl --user -u thermal-alert.service -f
+journalctl --user -u thermal-control.service -f
 ```
 
 ---
@@ -259,7 +259,7 @@ journalctl --user -u thermal-alert.service -f
 
 ## License
 
-more-than-vitals is licensed under the [PolyForm Noncommercial License 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0/).
+thermal-control is licensed under the [PolyForm Noncommercial License 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0/).
 
 You are free to use, modify, and share this software for any **noncommercial**
 purpose. Commercial use is not permitted under this license. See the

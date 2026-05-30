@@ -1,0 +1,26 @@
+name: thermal-control
+title: Thermal Control
+version: '0.1.0'
+summary: Lightweight thermal monitor with desktop alerts
+description: |
+  thermal-control watches CPU and GPU temperatures via Linux hwmon sensors
+  and notifies you when they cross a threshold. Choose to switch to
+  balanced power mode or dismiss — no dependencies beyond a standard
+  GNOME/Ubuntu desktop.
+base: core24
+confinement: classic
+grade: stable
+license: LicenseRef-PolyForm-Noncommercial-1.0.0
+
+apps:
+  thermal-control:
+    command: bin/thermal-control
+
+parts:
+  thermal-control:
+    plugin: dump
+    source: .
+    organize:
+      thermal-control: bin/thermal-control
+    stage:
+      - bin/thermal-control

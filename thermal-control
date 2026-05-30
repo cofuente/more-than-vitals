@@ -1,6 +1,6 @@
 #!/bin/bash
-# thermal-alert — lightweight thermal monitor with desktop notifications
-# Part of the More Than Vitals project
+# thermal-control — lightweight thermal monitor with desktop notifications
+# Part of the Thermal Control project
 
 set -euo pipefail
 
@@ -18,9 +18,9 @@ LAST_ALERT=0
 # ─── Usage ───────────────────────────────────────────────────────────────────
 usage() {
     cat <<'EOF'
-thermal-alert — lightweight thermal monitor with desktop notifications
+thermal-control — lightweight thermal monitor with desktop notifications
 
-Usage: thermal-alert [OPTIONS]
+Usage: thermal-control [OPTIONS]
 
 Options:
   -t, --threshold CELSIUS   Alert threshold in °C (default: 85)
@@ -31,10 +31,10 @@ Options:
   -h, --help                Show this help
 
 Examples:
-  thermal-alert                        # defaults: 85°C, 5min cooldown
-  thermal-alert -t 80 -n 10           # lower threshold, longer cooldown
-  thermal-alert --auto-remediate       # hands-free summer mode
-  thermal-alert -s                     # silent — useful with systemd logging
+  thermal-control                        # defaults: 85°C, 5min cooldown
+  thermal-control -t 80 -n 10           # lower threshold, longer cooldown
+  thermal-control --auto-remediate       # hands-free summer mode
+  thermal-control -s                     # silent — useful with systemd logging
 EOF
     exit 0
 }
@@ -73,12 +73,12 @@ CPU_SENSOR=$(find_sensor "k10temp" || find_sensor "coretemp" || true)
 GPU_SENSOR=$(find_sensor "amdgpu" || find_sensor "i915" || find_sensor "nouveau" || find_sensor "nvidia" || true)
 
 if [[ -z "$CPU_SENSOR" && -z "$GPU_SENSOR" ]]; then
-    echo "thermal-alert: no CPU or GPU sensor found. Exiting." >&2
+    echo "thermal-control: no CPU or GPU sensor found. Exiting." >&2
     exit 1
 fi
 
-[[ -n "$CPU_SENSOR" ]] && echo "thermal-alert: CPU sensor → $CPU_SENSOR"
-[[ -n "$GPU_SENSOR" ]] && echo "thermal-alert: GPU sensor → $GPU_SENSOR"
+[[ -n "$CPU_SENSOR" ]] && echo "thermal-control: CPU sensor → $CPU_SENSOR"
+[[ -n "$GPU_SENSOR" ]] && echo "thermal-control: GPU sensor → $GPU_SENSOR"
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
 read_temp() {
@@ -126,7 +126,7 @@ show_alert() {
 }
 
 # ─── Main loop ───────────────────────────────────────────────────────────────
-echo "thermal-alert: monitoring (threshold=${THRESHOLD}°C, cooldown=${COOLDOWN}m, poll=${POLL}s)"
+echo "thermal-control: monitoring (threshold=${THRESHOLD}°C, cooldown=${COOLDOWN}m, poll=${POLL}s)"
 
 while true; do
     cpu_temp=$(read_temp "$CPU_SENSOR")
